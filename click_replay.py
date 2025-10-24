@@ -58,6 +58,15 @@ def play_record(filename, loop=False, loop_interval=0):
     is_playing = True
     stop_event.clear()
 
+    # ✅ 新增：监听 ESC 键退出
+    def on_key_press(key):
+        if key == keyboard.Key.esc:
+            stop_event.set()
+            return False  # 停止监听
+
+    listener = keyboard.Listener(on_press=on_key_press)
+    listener.start()
+
     print(f"▶ Playing back {filename}{' in loop' if loop else ''}...")
     try:
         while not stop_event.is_set():
