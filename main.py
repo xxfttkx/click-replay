@@ -1,7 +1,10 @@
+
 import json
 import os
 import time
 from pynput import mouse, keyboard
+from pynput.mouse import Controller, Button
+import argparse
 
 RECORD_DIR = "records"
 os.makedirs(RECORD_DIR, exist_ok=True)
@@ -40,8 +43,7 @@ def stop_record():
     print(f"💾 Recording saved to {filepath}")
 
 
-def play_record(filename):
-    global is_playing
+def play_record(filename, loop=False):
     filepath = os.path.join(RECORD_DIR, filename)
     if not os.path.exists(filepath):
         print(f"❌ File not found: {filepath}")
@@ -50,20 +52,23 @@ def play_record(filename):
     with open(filepath, "r", encoding="utf-8") as f:
         actions = json.load(f)
 
-    from pynput.mouse import Controller, Button
     m = Controller()
-    start_time = time.time()
-    is_playing = True
 
-    print(f"▶ Playing back {filename} ...")
-    for i, a in enumerate(actions):
-        if not is_playing:
-            break
-        if i > 0:
-            time.sleep(a["time"] - actions[i - 1]["time"])
-        m.position = (a["x"], a["y"])
-        m.click(Button.left if "left" in a["button"] else Button.right)
-    print("✅ Playback finished.")
+    print(f"▶ Playing back {filename}{' in loop' if loop else ''}...")
+    try:
+        while True:
+            start_time = time.time()
+            for i, a in enumerate(actions):
+                if i > 0:
+                    time.sleep(a["time"] - actions[i - 1]["time"])
+                m.position = (a["x"], a["y"])
+                btn = Button.left if "left" in a["button"] else Button.right
+                m.click(btn)
+            print(f"✅ One playback done ({time.time() - start_time:.1f}s).")
+            if not loop:
+                break
+    except KeyboardInterrupt:
+        print("\n🛑 Stopped by user.")
 
 
 def on_key_press(key):
@@ -95,9 +100,15 @@ def on_key_press(key):
 
 
 if __name__ == "__main__":
-    print("GhostCursor — Simple Mouse Recorder & Player")
-    print("🎧 Controls: [F7] Start/Stop Record | [F11] Play | [ESC] Quit")
+    parser = argparse.ArgumentParser(description="click-replay — Simple Mouse Recorder & Player")
+    parser.add_argument("--replay", type=str, help="Replay a saved record (JSON filename)")
+    parser.add_argument("--loop", action="store_true", help="Loop replay continuously")
+    args = parser.parse_args()
 
-    with mouse.Listener(on_click=record_mouse_click):
-        with keyboard.Listener(on_press=on_key_press) as kl:
-            kl.join()
+    if args.replay:
+        play_record(args.replay, loop=args.loop)
+    else:
+        print("🎧 Controls: [F7] Start/Stop Record | [F11] Play | [ESC] Quit")
+        with mouse.Listener(on_click=record_mouse_click):
+            with keyboard.Listener(on_press=on_key_press) as kl:
+                kl.join()
